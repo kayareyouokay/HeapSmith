@@ -886,7 +886,7 @@ void *nn_aligned_alloc(size_t align, size_t size)
 {
     void *ptr = NULL;
 
-    if (size % align != 0) {
+    if (align < sizeof(void *) || !is_power_of_two(align) || size % align != 0) {
         errno = EINVAL;
         return NULL;
     }

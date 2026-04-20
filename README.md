@@ -4,18 +4,23 @@
 ["Malloc is not magic"](https://levelup.gitconnected.com/malloc-is-not-magic-implementing-my-own-memory-allocator-e0354e914402)
 article.
 
-It follows the same core idea from the article: keep metadata beside each heap
-block, track free space in a linked list, split useful chunks, merge freed
-neighbors, and grow the heap with `sbrk`.
+It started from the same core idea in the article: keep metadata beside each
+heap block, track free space, split useful chunks, and merge freed neighbors.
+The current version goes further and uses `mmap` arenas instead of `sbrk`.
 
-The implementation adds a few extra pieces:
+The implementation now includes:
 
+- per-thread arenas to reduce lock contention
+- segregated free-list bins for small and medium allocations
+- direct `mmap` mappings for large and explicitly aligned allocations
 - aligned payloads for normal C types
-- best-fit block selection
-- footer checks to catch broken block metadata
-- `pthread_mutex_t` locking around allocator state
-- page trimming when the last free block gets large
-- `calloc`, `realloc`, stats, and heap validation helpers
+- block splitting and neighbor coalescing
+- canary checks before and after payload storage
+- freed-memory poisoning
+- optional debug quarantine with `-DNN_ALLOC_DEBUG`
+- `calloc`, `realloc`, `reallocarray`, `posix_memalign`, and `aligned_alloc`
+- leak dumping, stats, usable-size, and heap validation helpers
+- a shared library that can be tested with `LD_PRELOAD`
 
 Public API:
 
@@ -23,14 +28,31 @@ Public API:
 - `nn_free`
 - `nn_calloc`
 - `nn_realloc`
-- `nn_allocator_stats`
+- `nn_reallocarray`
+- `nn_posix_memalign`
+- `nn_aligned_alloc`
+- `nn_malloc_usable_size`
+- `nn_allocator_dump_leaks`
+- `nn_get_allocator_stats`
+- `nn_allocator_check`
 
-Build and test:
+Build:
 
 ```sh
+make
 make test
+make debug-test
+make preload-test
+make bench
 ```
 
-This is still a learning allocator, not a libc replacement. It uses `sbrk`, so
-keep it as a project for studying allocator internals instead of linking it into
-random production programs.
+Try the preload build:
+
+```sh
+LD_PRELOAD="$PWD/build/libnnalloc.so" ./some_program
+```
+
+This is much closer to a real allocator than the first version, but it still
+needs serious fuzzing, sanitizer runs, workload benchmarks, and platform testing
+before anyone should trust it like jemalloc, mimalloc, tcmalloc, or glibc
+`malloc`.

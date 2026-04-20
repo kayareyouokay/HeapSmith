@@ -5,7 +5,9 @@
 #include <stdint.h>
 #include <stdalign.h>
 #include <stddef.h>
+#include <stdio.h>
 #include <string.h>
+#include <pthread.h>
 
 static void basic_alloc_free(void)
 {
@@ -33,7 +35,9 @@ static void reuse_freed_block(void)
 
     nn_free(b);
     void *d = nn_malloc(96);
+#ifndef NN_ALLOC_DEBUG
     assert(d == b);
+#endif
 
     nn_free(a);
     nn_free(c);
@@ -52,7 +56,9 @@ static void coalesce_neighbors(void)
     nn_free(a);
 
     void *joined = nn_malloc(160);
+#ifndef NN_ALLOC_DEBUG
     assert(joined == a);
+#endif
 
     nn_free(joined);
     nn_free(c);
@@ -113,6 +119,84 @@ static void large_free_returns_pages(void)
     assert(nn_allocator_check());
 }
 
+static void aligned_allocations_work(void)
+{
+    void *ptr = NULL;
+    int rc = nn_posix_memalign(&ptr, 64, 100);
+    assert(rc == 0);
+    assert(ptr != NULL);
+    assert((uintptr_t)ptr % 64 == 0);
+    assert(nn_malloc_usable_size(ptr) >= 100);
+    memset(ptr, 1, 100);
+    nn_free(ptr);
+
+    ptr = nn_aligned_alloc(4096, 4096);
+    assert(ptr != NULL);
+    assert((uintptr_t)ptr % 4096 == 0);
+    nn_free(ptr);
+}
+
+static void reallocarray_checks_overflow(void)
+{
+    errno = 0;
+    void *ptr = nn_reallocarray(NULL, (size_t)-1, 2);
+    assert(ptr == NULL);
+    assert(errno == ENOMEM);
+}
+
+static void leak_report_counts_live_blocks(void)
+{
+    void *leak = nn_malloc_debug(77, __FILE__, __LINE__);
+    assert(leak != NULL);
+
+    FILE *out = tmpfile();
+    assert(out != NULL);
+    size_t leaks = nn_allocator_dump_leaks(out);
+    assert(leaks >= 1);
+
+    fclose(out);
+    nn_free(leak);
+}
+
+static void *thread_worker(void *arg)
+{
+    (void)arg;
+
+    for (int i = 0; i < 2000; i++) {
+        size_t size = (size_t)((i * 37) % 2048) + 1;
+        unsigned char *ptr = nn_malloc(size);
+        assert(ptr != NULL);
+        memset(ptr, i & 0xff, size);
+
+        if ((i % 3) == 0) {
+            unsigned char *bigger = nn_realloc(ptr, size + 128);
+            assert(bigger != NULL);
+            ptr = bigger;
+        }
+
+        nn_free(ptr);
+    }
+
+    return NULL;
+}
+
+static void threaded_allocations_work(void)
+{
+    pthread_t threads[4];
+
+    for (size_t i = 0; i < 4; i++) {
+        assert(pthread_create(&threads[i], NULL, thread_worker, NULL) == 0);
+    }
+
+    for (size_t i = 0; i < 4; i++) {
+        assert(pthread_join(threads[i], NULL) == 0);
+    }
+
+    nn_allocator_stats stats = nn_get_allocator_stats();
+    assert(stats.arena_count >= 4);
+    assert(nn_allocator_check());
+}
+
 int main(void)
 {
     basic_alloc_free();
@@ -122,6 +206,10 @@ int main(void)
     realloc_keeps_data();
     bad_free_does_not_break_heap();
     large_free_returns_pages();
+    aligned_allocations_work();
+    reallocarray_checks_overflow();
+    leak_report_counts_live_blocks();
+    threaded_allocations_work();
     assert(nn_allocator_check());
     return 0;
 }
