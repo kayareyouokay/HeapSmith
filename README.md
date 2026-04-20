@@ -1,6 +1,6 @@
-# nn_alloc
+# HeapSmith
 
-`nn_alloc` is an experimental C memory allocator inspired by allocator internals
+`HeapSmith` is an experimental C memory allocator inspired by allocator internals
 and articles such as "Malloc is not magic". It implements a small malloc-family
 API, optional debug metadata, allocator integrity checks, leak reporting,
 `LD_PRELOAD` interposition, fuzz tests, and a simple benchmark harness.
