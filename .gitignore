@@ -1,0 +1,7 @@
+build/
+.codex
+*.o
+*.a
+*.so
+*.dSYM/
+test_allocator
