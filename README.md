@@ -21,6 +21,7 @@ The implementation now includes:
 - `calloc`, `realloc`, `reallocarray`, `posix_memalign`, and `aligned_alloc`
 - leak dumping, stats, usable-size, and heap validation helpers
 - a shared library that can be tested with `LD_PRELOAD`
+- sanitizer, preload, fuzz, long-fuzz, and benchmark targets
 
 Public API:
 
@@ -42,10 +43,26 @@ Build:
 make
 make test
 make debug-test
+make sanitize-test
 make preload-test
+make hostile-preload-test
 make fuzz
+make long-fuzz
+make sanitize-fuzz
 make bench
 make bench-system
+```
+
+Full local verification:
+
+```sh
+make check-all
+```
+
+`long-fuzz` defaults to 250,000 randomized operations. You can raise it:
+
+```sh
+make long-fuzz LONG_FUZZ_STEPS=2000000
 ```
 
 Try the preload build:
@@ -55,9 +72,9 @@ LD_PRELOAD="$PWD/build/libnnalloc.so" ./some_program
 ```
 
 This is much closer to a real allocator than the first version, but it still
-needs longer fuzz runs, sanitizer runs, workload benchmarks, and platform
-testing before anyone should trust it like jemalloc, mimalloc, tcmalloc, or
-glibc `malloc`.
+needs more workload benchmarks, broader platform testing, and real application
+preload trials before anyone should trust it like jemalloc, mimalloc, tcmalloc,
+or glibc `malloc`.
 
 The benchmark can also be run against another allocator with `LD_PRELOAD`:
 

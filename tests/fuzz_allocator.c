@@ -4,8 +4,13 @@
 #include <stdint.h>
 #include <string.h>
 
-#define SLOTS 512
-#define STEPS 50000
+#ifndef NN_FUZZ_SLOTS
+#define NN_FUZZ_SLOTS 512
+#endif
+
+#ifndef NN_FUZZ_STEPS
+#define NN_FUZZ_STEPS 50000
+#endif
 
 typedef struct slot {
     unsigned char *ptr;
@@ -32,11 +37,11 @@ static void check_slot(slot *item)
 
 int main(void)
 {
-    slot slots[SLOTS] = {0};
+    slot slots[NN_FUZZ_SLOTS] = {0};
     uint32_t state = 0x12345678U;
 
-    for (size_t step = 0; step < STEPS; step++) {
-        size_t index = next_rand(&state) % SLOTS;
+    for (size_t step = 0; step < NN_FUZZ_STEPS; step++) {
+        size_t index = next_rand(&state) % NN_FUZZ_SLOTS;
         size_t action = next_rand(&state) % 4;
         size_t size = (next_rand(&state) % 8192U) + 1U;
 
@@ -67,7 +72,7 @@ int main(void)
         assert(nn_allocator_check());
     }
 
-    for (size_t i = 0; i < SLOTS; i++) {
+    for (size_t i = 0; i < NN_FUZZ_SLOTS; i++) {
         check_slot(&slots[i]);
         nn_free(slots[i].ptr);
     }

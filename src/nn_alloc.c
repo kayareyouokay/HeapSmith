@@ -658,6 +658,7 @@ static int resolve_in_block(nn_block *block, void *ptr, nn_ptr_info *info)
     return 0;
 }
 
+#ifndef __SANITIZE_ADDRESS__
 static int lock_resolved_block(nn_block *block, void *ptr, nn_ptr_info *info)
 {
     nn_arena *arena = block->arena;
@@ -697,14 +698,17 @@ static int resolve_ptr_fast(void *ptr, nn_ptr_info *info)
 
     return 0;
 }
+#endif
 
 static int resolve_ptr_locked(void *ptr, nn_ptr_info *info)
 {
     memset(info, 0, sizeof(*info));
 
+#ifndef __SANITIZE_ADDRESS__
     if (resolve_ptr_fast(ptr, info)) {
         return 1;
     }
+#endif
 
     pthread_mutex_lock(&global_lock);
     for (nn_arena *arena = arenas; arena != NULL; arena = arena->next) {
