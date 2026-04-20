@@ -15,8 +15,10 @@ TEST := $(BUILD_DIR)/test_allocator
 DEBUG_TEST := $(BUILD_DIR)/test_allocator_debug
 PRELOAD_TEST := $(BUILD_DIR)/test_preload
 BENCH := $(BUILD_DIR)/bench_allocator
+BENCH_SYSTEM := $(BUILD_DIR)/bench_system
+FUZZ := $(BUILD_DIR)/fuzz_allocator
 
-.PHONY: all test debug-test preload-test bench clean
+.PHONY: all test debug-test preload-test fuzz bench bench-system clean
 
 all: $(LIB) $(SHARED)
 
@@ -56,6 +58,12 @@ $(PRELOAD_TEST): tests/test_preload.c | $(BUILD_DIR)
 $(BENCH): benchmarks/bench_allocator.c $(LIB) include/nn_alloc.h | $(BUILD_DIR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) benchmarks/bench_allocator.c $(LIB) $(LDFLAGS) -o $@
 
+$(BENCH_SYSTEM): benchmarks/bench_allocator.c | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -DUSE_SYSTEM_MALLOC benchmarks/bench_allocator.c -o $@
+
+$(FUZZ): tests/fuzz_allocator.c $(LIB) include/nn_alloc.h | $(BUILD_DIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) tests/fuzz_allocator.c $(LIB) $(LDFLAGS) -o $@
+
 test: $(TEST)
 	./$(TEST)
 
@@ -65,8 +73,14 @@ debug-test: $(DEBUG_TEST)
 preload-test: $(SHARED) $(PRELOAD_TEST)
 	LD_PRELOAD=$(abspath $(SHARED)) ./$(PRELOAD_TEST)
 
+fuzz: $(FUZZ)
+	./$(FUZZ)
+
 bench: $(BENCH)
 	./$(BENCH)
+
+bench-system: $(BENCH_SYSTEM)
+	./$(BENCH_SYSTEM)
 
 clean:
 	rm -rf $(BUILD_DIR)

@@ -43,7 +43,9 @@ make
 make test
 make debug-test
 make preload-test
+make fuzz
 make bench
+make bench-system
 ```
 
 Try the preload build:
@@ -53,6 +55,13 @@ LD_PRELOAD="$PWD/build/libnnalloc.so" ./some_program
 ```
 
 This is much closer to a real allocator than the first version, but it still
-needs serious fuzzing, sanitizer runs, workload benchmarks, and platform testing
-before anyone should trust it like jemalloc, mimalloc, tcmalloc, or glibc
-`malloc`.
+needs longer fuzz runs, sanitizer runs, workload benchmarks, and platform
+testing before anyone should trust it like jemalloc, mimalloc, tcmalloc, or
+glibc `malloc`.
+
+The benchmark can also be run against another allocator with `LD_PRELOAD`:
+
+```sh
+make bench-system
+LD_PRELOAD=/path/to/libjemalloc.so ./build/bench_system
+```
