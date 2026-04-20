@@ -658,9 +658,53 @@ static int resolve_in_block(nn_block *block, void *ptr, nn_ptr_info *info)
     return 0;
 }
 
+static int lock_resolved_block(nn_block *block, void *ptr, nn_ptr_info *info)
+{
+    nn_arena *arena = block->arena;
+
+    if (arena == NULL || arena->magic != NN_ARENA_MAGIC) {
+        return 0;
+    }
+
+    pthread_mutex_lock(&arena->lock);
+    if (resolve_in_block(block, ptr, info)) {
+        return 1;
+    }
+    pthread_mutex_unlock(&arena->lock);
+    return 0;
+}
+
+static int resolve_ptr_fast(void *ptr, nn_ptr_info *info)
+{
+    uintptr_t value = (uintptr_t)ptr;
+
+    if ((value % alignment()) != 0) {
+        return 0;
+    }
+
+    nn_block *direct = (nn_block *)(value - header_size() - guard_size());
+    if (direct->magic == NN_BLOCK_MAGIC && lock_resolved_block(direct, ptr, info)) {
+        return 1;
+    }
+
+    nn_aligned_prefix *prefix = (nn_aligned_prefix *)(value - sizeof(*prefix));
+    if (prefix->magic == NN_PREFIX_MAGIC && prefix->base != NULL) {
+        nn_block *aligned = (nn_block *)((char *)prefix->base - header_size() - guard_size());
+        if (aligned->magic == NN_BLOCK_MAGIC && lock_resolved_block(aligned, ptr, info)) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 static int resolve_ptr_locked(void *ptr, nn_ptr_info *info)
 {
     memset(info, 0, sizeof(*info));
+
+    if (resolve_ptr_fast(ptr, info)) {
+        return 1;
+    }
 
     pthread_mutex_lock(&global_lock);
     for (nn_arena *arena = arenas; arena != NULL; arena = arena->next) {
